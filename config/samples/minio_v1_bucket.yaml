@@ -1,0 +1,15 @@
+apiVersion: minio.scc-digitalhub.github.io/v1
+kind: Bucket
+metadata:
+  labels:
+    app.kubernetes.io/name: bucket
+    app.kubernetes.io/instance: bucket-sample
+    app.kubernetes.io/part-of: minio-operator
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: minio-operator
+  name: bucket-sample
+spec:
+  region: us-east-1
+  objectLocking: true
+  quota: 10000000
+  emptyOnDelete: true

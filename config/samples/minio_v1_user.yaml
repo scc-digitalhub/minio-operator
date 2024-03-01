@@ -1,0 +1,16 @@
+apiVersion: minio.scc-digitalhub.github.io/v1
+kind: User
+metadata:
+  labels:
+    app.kubernetes.io/name: user
+    app.kubernetes.io/instance: user-sample
+    app.kubernetes.io/part-of: minio-operator
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: minio-operator
+  name: user-sample
+spec:
+  accessKey: usertest
+  secretKey: usertest
+  policies:
+    - writeonly
+    - diagnostics

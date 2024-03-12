@@ -25,8 +25,6 @@ type BucketSpec struct {
 	Region        string `json:"region,omitempty"`
 	ObjectLocking bool   `json:"objectLocking,omitempty"`
 	Quota         uint64 `json:"quota,omitempty"`
-	// When false, trying to delete a non-empty bucket will result in error.
-	EmptyOnDelete bool `json:"emptyOnDelete,omitempty"`
 }
 
 // BucketStatus defines the observed state of Bucket

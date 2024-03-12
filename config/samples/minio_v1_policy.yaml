@@ -8,5 +8,20 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/created-by: minio-operator
   name: policy-sample
-spec:
-  # TODO(user): Add fields here
+spec: 
+  content: >-
+    {
+      "Version": "2012-10-17",
+      "Statement": [
+          {
+              "Effect": "Allow",
+              "Action": [
+                  "s3:GetBucketLocation",
+                  "s3:GetObject"
+              ],
+              "Resource": [
+                  "arn:aws:s3:::*"
+              ]
+          }
+      ]
+    }

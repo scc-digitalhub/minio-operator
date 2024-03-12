@@ -166,7 +166,7 @@ func (r *PolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 
 	if cr.Status.State == typeReady {
-		// TODO
+		log.Info("Resource ready")
 		adminClient, err := getAdminClient()
 		if err != nil {
 			log.Error(err, "Failed to initialize MinIO admin client")
@@ -179,11 +179,11 @@ func (r *PolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			return setPolicyErrorState(r, ctx, cr, err)
 		}
 
-		updatePolicy, err := equivalentPolicies(policyInfo.Policy, cr.Spec.Content)
+		equivalent, err := equivalentPolicies(policyInfo.Policy, cr.Spec.Content)
 		if err != nil {
 			log.Error(err, "Failed to compare policies")
 			return setPolicyErrorState(r, ctx, cr, err)
-		} else if updatePolicy {
+		} else if !equivalent {
 			cr.Status.State = typeUpdating
 			if err = r.Status().Update(ctx, cr); err != nil {
 				log.Error(err, genericStatusUpdateFailedMessage)
@@ -204,7 +204,11 @@ func (r *PolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			log.Error(err, "Failed to initialize MinIO admin client")
 			return setPolicyErrorState(r, ctx, cr, err)
 		}
-		adminClient.AssignPolicy(context.Background(), cr.Name, []byte(cr.Spec.Content))
+		err = adminClient.AddCannedPolicy(context.Background(), cr.Name, []byte(cr.Spec.Content))
+		if err != nil {
+			log.Error(err, "Error while updating policy")
+			return setPolicyErrorState(r, ctx, cr, err)
+		}
 
 		// Update status
 		cr.Status.State = typeReady
@@ -254,7 +258,7 @@ func (r *PolicyReconciler) finalizerOpsForPolicy(cr *operatorv1.Policy) error {
 		return err
 	}
 
-	err = adminClient.DeletePolicy(context.Background(), cr.Name)
+	err = adminClient.RemoveCannedPolicy(context.Background(), cr.Name)
 	if err != nil {
 		return err
 	}

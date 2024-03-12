@@ -35,10 +35,6 @@ spec:
           spec:
             description: BucketSpec defines the desired state of Bucket
             properties:
-              emptyOnDelete:
-                description: When false, trying to delete a non-empty bucket will
-                  result in error.
-                type: boolean
               objectLocking:
                 type: boolean
               quota:

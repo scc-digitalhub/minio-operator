@@ -14,7 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// TODO quota off if no value provided
 // TODO emptyOnDelete in spec, if false and non-empty, remains in error pending deletion
 
 package controller
@@ -34,32 +33,11 @@ import (
 
 	"github.com/minio/madmin-go/v3"
 	"github.com/minio/minio-go/v7"
-	"github.com/minio/minio-go/v7/pkg/credentials"
 
 	operatorv1 "github.com/scc-digitalhub/minio-operator/api/v1"
 )
 
-const minioEndpoint = "localhost:9000"
-const accessKeyID = "minioadmin"
-const secretAccessKey = "minioadmin"
-const useSSL = false
-
-const genericStatusUpdateFailedMessage = "failed to update resource status"
-
 const bucketFinalizer = "minio.scc-digitalhub.github.io/bucket-finalizer"
-
-// Definitions to manage status conditions
-const (
-	typeCreating = "Creating"
-
-	typeReady = "Ready"
-
-	typeUpdating = "Updating"
-
-	typeDegraded = "Degraded"
-
-	typeError = "Error"
-)
 
 // BucketReconciler reconciles a Bucket object
 type BucketReconciler struct {
@@ -307,19 +285,6 @@ func (r *BucketReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-// Get MinIO client
-func getClient() (*minio.Client, error) {
-	return minio.New(minioEndpoint, &minio.Options{
-		Creds:  credentials.NewStaticV4(accessKeyID, secretAccessKey, ""),
-		Secure: useSSL,
-	})
-}
-
-// Get MinIO Admin client
-func getAdminClient() (*madmin.AdminClient, error) {
-	return madmin.New(minioEndpoint, accessKeyID, secretAccessKey, useSSL)
-}
-
 // Perform required operations before deleting the CR
 func (r *BucketReconciler) finalizerOpsForBucket(cr *operatorv1.Bucket) error {
 	client, err := getClient()
@@ -334,7 +299,7 @@ func (r *BucketReconciler) finalizerOpsForBucket(cr *operatorv1.Bucket) error {
 		if err == nil || strings.Contains(err.Error(), "does not exist") {
 			err = nil
 			break
-		} else if strings.Contains(err.Error(), "not empty") && cr.Spec.EmptyOnDelete {
+		} else if strings.Contains(err.Error(), "not empty") && emptyBucketOnDelete {
 			// List objects
 			listOpts := minio.ListObjectsOptions{
 				Recursive:    true,

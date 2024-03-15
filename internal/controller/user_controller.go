@@ -82,12 +82,12 @@ func (r *UserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 
 		adminClient, err := getAdminClient()
 		if err != nil {
-			log.Error(err, "Failed to initialize MinIO admin client")
+			log.Error(err, failedToObtainAdminClientMessage)
 			return setUserErrorState(r, ctx, cr, err)
 		}
 
 		// Does not return error if user already exists
-		err = adminClient.AddUser(context.Background(), cr.Spec.AccessKey, cr.Spec.SecretKey)
+		err = adminClient.SetUser(context.Background(), cr.Spec.AccessKey, cr.Spec.SecretKey, madmin.AccountStatus(cr.Spec.AccountStatus))
 		if err != nil {
 			log.Error(err, "Error while creating user")
 			return setUserErrorState(r, ctx, cr, err)
@@ -113,7 +113,7 @@ func (r *UserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		}
 
 		// Set policies
-		if len(cr.Spec.Policies) > 0 {
+		if cr.Spec.AccountStatus == "enabled" && len(cr.Spec.Policies) > 0 {
 			req := madmin.PolicyAssociationReq{
 				Policies: cr.Spec.Policies,
 				User:     cr.Spec.AccessKey,
@@ -150,15 +150,6 @@ func (r *UserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 				return ctrl.Result{Requeue: true}, nil
 			}
 
-			// Re-fetch CR before updating the status to have the latest state
-			// of the resource on the cluster, to avoid the issue "the object
-			// has been modified, please apply your changes to the latest
-			// version and try again", which would re-trigger reconciliation
-			if err := r.Get(ctx, req.NamespacedName, cr); err != nil {
-				log.Error(err, "failed to re-fetch resource")
-				return ctrl.Result{}, err
-			}
-
 			cr.Status.State = typeDegraded
 
 			if err := r.Status().Update(ctx, cr); err != nil {
@@ -185,12 +176,12 @@ func (r *UserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		log.Info("Resource in Ready state")
 		adminClient, err := getAdminClient()
 		if err != nil {
-			log.Error(err, "Failed to initialize MinIO admin client")
+			log.Error(err, failedToObtainAdminClientMessage)
 			return setUserErrorState(r, ctx, cr, err)
 		}
 
-		// TODO can't check previous secret key to see if it has changed...
-		err = adminClient.SetUser(context.Background(), cr.Spec.AccessKey, cr.Spec.SecretKey, "enabled")
+		// We are unable to check if the secret key has changed, so we just set it again
+		err = adminClient.SetUser(context.Background(), cr.Spec.AccessKey, cr.Spec.SecretKey, madmin.AccountStatus(cr.Spec.AccountStatus))
 		if err != nil {
 			log.Error(err, "Error setting user")
 			return setUserErrorState(r, ctx, cr, err)
@@ -205,7 +196,7 @@ func (r *UserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 
 		currentPolicies := strings.Split(userInfo.PolicyName, ",")
 		toDetach, toAttach := arrayDifference(cr.Spec.Policies, currentPolicies)
-		if len(toDetach) > 0 {
+		if cr.Spec.AccountStatus == "enabled" && len(toDetach) > 0 {
 			req := madmin.PolicyAssociationReq{
 				Policies: toDetach,
 				User:     cr.Spec.AccessKey,
@@ -216,7 +207,7 @@ func (r *UserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 				return setUserErrorState(r, ctx, cr, err)
 			}
 		}
-		if len(toAttach) > 0 {
+		if cr.Spec.AccountStatus == "enabled" && len(toAttach) > 0 {
 			req := madmin.PolicyAssociationReq{
 				Policies: toAttach,
 				User:     cr.Spec.AccessKey,
@@ -233,25 +224,12 @@ func (r *UserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 
 	// Update resource
 	if cr.Status.State == typeUpdating {
-		// TODO
 		return ctrl.Result{}, nil
 	}
 
 	// Error state
 	if cr.Status.State == typeError {
 		log.Info("Resource in error state")
-
-		adminClient, err := getAdminClient()
-		if err != nil {
-			log.Error(err, "Failed to initialize MinIO admin client")
-			return setUserErrorState(r, ctx, cr, err)
-		}
-
-		err = adminClient.RemoveUser(context.Background(), cr.Spec.AccessKey)
-		if err != nil {
-			log.Error(err, "Failed to clean up user")
-		}
-
 		return ctrl.Result{}, nil
 	}
 
@@ -307,13 +285,13 @@ func arrayDifference(a []string, b []string) ([]string, []string) {
 	var additional []string
 
 	for _, element := range b {
-		if !slices.Contains(a, element) {
+		if !slices.Contains(a, element) && element != "" {
 			missing = append(missing, element)
 		}
 	}
 
 	for _, element := range a {
-		if !slices.Contains(b, element) {
+		if !slices.Contains(b, element) && element != "" {
 			additional = append(additional, element)
 		}
 	}

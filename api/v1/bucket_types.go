@@ -22,9 +22,11 @@ import (
 
 // BucketSpec defines the desired state of Bucket
 type BucketSpec struct {
-	Region        string `json:"region,omitempty"`
-	ObjectLocking bool   `json:"objectLocking,omitempty"`
-	Quota         uint64 `json:"quota,omitempty"`
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.-]){1,61}[a-z0-9]$`
+	Name string `json:"name"`
+	// +kubebuilder:validation:Optional
+	Quota uint64 `json:"quota,omitempty"`
 }
 
 // BucketStatus defines the observed state of Bucket

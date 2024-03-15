@@ -8,7 +8,9 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/created-by: minio-operator
   name: policy-sample
-spec: 
+  namespace: minio-operator-system
+spec:
+  name: policy1
   content: >-
     {
       "Version": "2012-10-17",

@@ -47,13 +47,14 @@ spec:
           spec:
             description: BucketSpec defines the desired state of Bucket
             properties:
-              objectLocking:
-                type: boolean
+              name:
+                pattern: ^[a-z0-9]([a-z0-9\.-]){1,61}[a-z0-9]$
+                type: string
               quota:
                 format: int64
                 type: integer
-              region:
-                type: string
+            required:
+            - name
             type: object
           status:
             description: BucketStatus defines the observed state of Bucket
@@ -107,6 +108,12 @@ spec:
             properties:
               content:
                 type: string
+              name:
+                pattern: '[^\s]*'
+                type: string
+            required:
+            - content
+            - name
             type: object
           status:
             description: PolicyStatus defines the observed state of Policy
@@ -160,12 +167,21 @@ spec:
             properties:
               accessKey:
                 type: string
+              accountStatus:
+                default: enabled
+                enum:
+                - enabled
+                - disabled
+                type: string
               policies:
                 items:
                   type: string
                 type: array
               secretKey:
                 type: string
+            required:
+            - accessKey
+            - secretKey
             type: object
           status:
             description: UserStatus defines the observed state of User
@@ -240,10 +256,11 @@ rules:
   - patch
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
+kind: Role
 metadata:
   creationTimestamp: null
   name: minio-operator-manager-role
+  namespace: minio-operator-system
 rules:
 - apiGroups:
   - minio.scc-digitalhub.github.io
@@ -388,19 +405,20 @@ subjects:
   namespace: minio-operator-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
+kind: RoleBinding
 metadata:
   labels:
     app.kubernetes.io/component: rbac
     app.kubernetes.io/created-by: minio-operator
     app.kubernetes.io/instance: manager-rolebinding
     app.kubernetes.io/managed-by: kustomize
-    app.kubernetes.io/name: clusterrolebinding
+    app.kubernetes.io/name: rolebinding
     app.kubernetes.io/part-of: minio-operator
   name: minio-operator-manager-rolebinding
+  namespace: minio-operator-system
 roleRef:
   apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
+  kind: Role
   name: minio-operator-manager-role
 subjects:
 - kind: ServiceAccount
@@ -521,17 +539,19 @@ spec:
         command:
         - /manager
         env:
+        - name: WATCH_NAMESPACE
+          value: minio-operator-system
         - name: MINIO_ENDPOINT
-          value: localhost:9000
+          value: 192.168.123.123:9000
         - name: MINIO_ACCESS_KEY_ID
           value: minioadmin
         - name: MINIO_SECRET_ACCESS_KEY
           value: minioadmin
         - name: MINIO_USE_SSL
-          value: false
+          value: "false"
         - name: MINIO_EMPTY_BUCKET_ON_DELETE
-          value: true
-        image: controller:latest
+          value: "true"
+        image: albcar/minio-operator:latest
         livenessProbe:
           httpGet:
             path: /healthz

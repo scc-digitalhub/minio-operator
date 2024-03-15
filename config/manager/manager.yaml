@@ -70,8 +70,21 @@ spec:
         - /manager
         args:
         - --leader-elect
-        image: controller:latest
+        image: ghcr.io/scc-digitalhub/minio-operator:latest
         name: manager
+        env:
+        - name: WATCH_NAMESPACE
+          value: "minio-operator-system"
+        - name: MINIO_ENDPOINT
+          value: localhost:9000
+        - name: MINIO_ACCESS_KEY_ID
+          value: minioadmin
+        - name: MINIO_SECRET_ACCESS_KEY
+          value: minioadmin
+        - name: MINIO_USE_SSL
+          value: "false"
+        - name: MINIO_EMPTY_BUCKET_ON_DELETE
+          value: "true"
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:

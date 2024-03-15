@@ -14,13 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// TODO emptyOnDelete in spec, if false and non-empty, remains in error pending deletion
-
 package controller
 
 import (
 	"context"
 	"fmt"
+	"os"
+	"strconv"
 	"strings"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -38,6 +38,8 @@ import (
 )
 
 const bucketFinalizer = "minio.scc-digitalhub.github.io/bucket-finalizer"
+
+const envEmptyBucketOnDelete = "MINIO_EMPTY_BUCKET_ON_DELETE"
 
 // BucketReconciler reconciles a Bucket object
 type BucketReconciler struct {
@@ -82,40 +84,26 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	// Create resource, if it doesn't exist
 	if cr.Status.State == typeCreating {
-		// TODO use bucket's CR name, or add a CR field?
-		// TODO bucket name has to match the following regex: ^(?!xn--)(?![0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$)[a-z0-9]((?!.*--)(?!.*\.\.)(?!.*\.-)(?!.*-\.)[a-z0-9\.-]){1,61}[a-z0-9](?<!-s3alias)$
 		log.Info("Creating resource")
 
 		client, err := getClient()
 		if err != nil {
-			log.Error(err, "Failed to initialize MinIO client")
+			log.Error(err, failedToObtainClientMessage)
 			return setBucketErrorState(r, ctx, cr, err)
 		}
 
-		// If resource already exists, no need to create it
-		found, err := client.BucketExists(context.Background(), cr.Name)
-		if err != nil {
-			log.Error(err, "Failed to check if resource already exists")
+		// Create resource
+		err = client.MakeBucket(context.Background(), cr.Spec.Name, minio.MakeBucketOptions{})
+		if err != nil && !strings.Contains(err.Error(), "Your previous request to create the named bucket succeeded and you already own it") {
+			log.Error(err, "Error while creating bucket")
+			return setBucketErrorState(r, ctx, cr, err)
 		}
-		if found {
-			log.Info("Resource already exists, no need to create it")
-		} else {
-			// Create resource
-			err = client.MakeBucket(context.Background(), cr.Name, minio.MakeBucketOptions{
-				Region:        cr.Spec.Region,
-				ObjectLocking: cr.Spec.ObjectLocking,
-			})
-			if err != nil {
-				log.Error(err, "Error while creating bucket")
-				return setBucketErrorState(r, ctx, cr, err)
-			}
 
-			if cr.Spec.Quota != 0 {
-				err = setQuota(cr.Name, cr.Spec.Quota)
-				if err != nil {
-					log.Error(err, "Failed to set quota")
-					return setBucketErrorState(r, ctx, cr, err)
-				}
+		if cr.Spec.Quota != 0 {
+			err = setQuota(cr.Spec.Name, cr.Spec.Quota)
+			if err != nil {
+				log.Error(err, "Failed to set quota")
+				return setBucketErrorState(r, ctx, cr, err)
 			}
 		}
 
@@ -162,15 +150,6 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 				return setBucketErrorState(r, ctx, cr, err)
 			}
 
-			// Re-fetch CR before updating the status to have the latest state
-			// of the resource on the cluster, to avoid the issue "the object
-			// has been modified, please apply your changes to the latest
-			// version and try again", which would re-trigger reconciliation
-			if err := r.Get(ctx, req.NamespacedName, cr); err != nil {
-				log.Error(err, "failed to re-fetch resource")
-				return ctrl.Result{}, err
-			}
-
 			cr.Status.State = typeDegraded
 
 			if err := r.Status().Update(ctx, cr); err != nil {
@@ -194,34 +173,20 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	// Check if resource needs updating
 	if cr.Status.State == typeReady {
-		/* // TODO unclear how to later enable/disable object locking to update a bucket
-		client, err := getClient()
-		if err != nil {
-			log.Error(err, "Failed to initialize MinIO client")
-			return setBucketErrorState(r, ctx, cr, err)
-		}
-
-		objectLocking, _, _, _, err := client.GetObjectLockConfig(context.Background(), cr.Name)
-		if err != nil && !strings.Contains(err.Error(), "does not exist") {
-			log.Error(err, "Failed to check bucket object lock config")
-			return setBucketErrorState(r, ctx, cr, err)
-		}
-		objectLockingEnabled := objectLocking == "Enabled"
-		*/
+		log.Info("Resource in Ready state")
 
 		// Check quota
 		adminClient, err := getAdminClient()
 		if err != nil {
-			log.Error(err, "Failed to initialize MinIO admin client")
+			log.Error(err, failedToObtainAdminClientMessage)
 			return setBucketErrorState(r, ctx, cr, err)
 		}
 
-		quota, err := adminClient.GetBucketQuota(context.Background(), cr.Name)
+		quota, err := adminClient.GetBucketQuota(context.Background(), cr.Spec.Name)
 		if err != nil {
 			log.Error(err, "Failed to check resource properties")
 		}
 
-		// if objectLockingEnabled != cr.Spec.ObjectLocking || quota.Quota != cr.Spec.Quota {
 		if quota.Quota != cr.Spec.Quota {
 			cr.Status.State = typeUpdating
 			if err = r.Status().Update(ctx, cr); err != nil {
@@ -237,22 +202,8 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	if cr.Status.State == typeUpdating {
 		log.Info("Updating resource")
 
-		/* // TODO unclear how to enable/disable object locking on a created bucket
-		// Set object locking
-		client, err := getClient()
-		if err != nil {
-			log.Error(err, "Failed to initialize MinIO client")
-			return setBucketErrorState(r, ctx, cr, err)
-		}
-		err = client.SetObjectLockConfig(context.Background(), cr.Name, nil, nil, nil)
-		if err != nil {
-			log.Error(err, "Failed to update object locking config")
-			return setBucketErrorState(r, ctx, cr, err)
-		}
-		*/
-
 		// Set quota
-		err = setQuota(cr.Name, cr.Spec.Quota)
+		err = setQuota(cr.Spec.Name, cr.Spec.Quota)
 		if err != nil {
 			log.Error(err, "Failed to set quota")
 			return setBucketErrorState(r, ctx, cr, err)
@@ -271,7 +222,6 @@ func (r *BucketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	// Error state
 	if cr.Status.State == typeError {
 		log.Info("Resource in error state")
-		// TODO It may be in error state due to bucket not being empty, therefore it cannot be deleted
 		return ctrl.Result{}, nil
 	}
 
@@ -292,10 +242,15 @@ func (r *BucketReconciler) finalizerOpsForBucket(cr *operatorv1.Bucket) error {
 		return err
 	}
 
+	emptyBucketOnDelete, err := readEmptyBucketOnDelete()
+	if err != nil {
+		return err
+	}
+
 	// According to the documentation, client.RemoveObjects
 	// only deletes up to 1000 objects, hence the for loop
 	for {
-		err = client.RemoveBucket(context.Background(), cr.Name)
+		err = client.RemoveBucket(context.Background(), cr.Spec.Name)
 		if err == nil || strings.Contains(err.Error(), "does not exist") {
 			err = nil
 			break
@@ -305,10 +260,10 @@ func (r *BucketReconciler) finalizerOpsForBucket(cr *operatorv1.Bucket) error {
 				Recursive:    true,
 				WithVersions: true,
 			}
-			objectsCh := client.ListObjects(context.Background(), cr.Name, listOpts)
+			objectsCh := client.ListObjects(context.Background(), cr.Spec.Name, listOpts)
 
 			// Delete them
-			client.RemoveObjects(context.Background(), cr.Name, objectsCh, minio.RemoveObjectsOptions{GovernanceBypass: true})
+			client.RemoveObjects(context.Background(), cr.Spec.Name, objectsCh, minio.RemoveObjectsOptions{GovernanceBypass: true})
 		} else {
 			break
 		}
@@ -358,4 +313,19 @@ func setQuota(bucketName string, value uint64) error {
 	}
 
 	return nil
+}
+
+func readEmptyBucketOnDelete() (bool, error) {
+	emptyBucketOnDelete := false
+
+	emptyBucketOnDeleteString, found := os.LookupEnv(envEmptyBucketOnDelete)
+	if found {
+		emptyBucketOnDeleteParsed, err := strconv.ParseBool(emptyBucketOnDeleteString)
+		if err != nil {
+			return false, fmt.Errorf("%s must be either true or false", envEmptyBucketOnDelete)
+		}
+		emptyBucketOnDelete = emptyBucketOnDeleteParsed
+	}
+
+	return emptyBucketOnDelete, nil
 }

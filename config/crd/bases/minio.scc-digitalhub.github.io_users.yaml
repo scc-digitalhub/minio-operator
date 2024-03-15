@@ -37,12 +37,21 @@ spec:
             properties:
               accessKey:
                 type: string
+              accountStatus:
+                default: enabled
+                enum:
+                - enabled
+                - disabled
+                type: string
               policies:
                 items:
                   type: string
                 type: array
               secretKey:
                 type: string
+            required:
+            - accessKey
+            - secretKey
             type: object
           status:
             description: UserStatus defines the observed state of User

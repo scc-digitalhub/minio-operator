@@ -8,10 +8,10 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/created-by: minio-operator
   name: user-sample
+  namespace: minio-operator-system
 spec:
   accessKey: usertest
   secretKey: usertest
   policies:
-    - writeonly
     - diagnostics
-    - policy-sample
+    - writeonly

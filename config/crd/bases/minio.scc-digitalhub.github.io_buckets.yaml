@@ -35,13 +35,14 @@ spec:
           spec:
             description: BucketSpec defines the desired state of Bucket
             properties:
-              objectLocking:
-                type: boolean
+              name:
+                pattern: ^[a-z0-9]([a-z0-9\.-]){1,61}[a-z0-9]$
+                type: string
               quota:
                 format: int64
                 type: integer
-              region:
-                type: string
+            required:
+            - name
             type: object
           status:
             description: BucketStatus defines the observed state of Bucket

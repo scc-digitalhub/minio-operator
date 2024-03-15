@@ -82,11 +82,11 @@ func (r *PolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 		adminClient, err := getAdminClient()
 		if err != nil {
-			log.Error(err, "Failed to initialize MinIO admin client")
+			log.Error(err, failedToObtainAdminClientMessage)
 			return setPolicyErrorState(r, ctx, cr, err)
 		}
 
-		err = adminClient.AddCannedPolicy(context.Background(), cr.Name, []byte(cr.Spec.Content))
+		err = adminClient.AddCannedPolicy(context.Background(), cr.Spec.Name, []byte(cr.Spec.Content))
 		if err != nil {
 			log.Error(err, "Error while creating policy")
 			return setPolicyErrorState(r, ctx, cr, err)
@@ -135,15 +135,6 @@ func (r *PolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 				return setPolicyErrorState(r, ctx, cr, err)
 			}
 
-			// Re-fetch CR before updating the status to have the latest state
-			// of the resource on the cluster, to avoid the issue "the object
-			// has been modified, please apply your changes to the latest
-			// version and try again", which would re-trigger reconciliation
-			if err := r.Get(ctx, req.NamespacedName, cr); err != nil {
-				log.Error(err, "failed to re-fetch resource")
-				return ctrl.Result{}, err
-			}
-
 			cr.Status.State = typeDegraded
 
 			if err := r.Status().Update(ctx, cr); err != nil {
@@ -166,14 +157,14 @@ func (r *PolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 
 	if cr.Status.State == typeReady {
-		log.Info("Resource ready")
+		log.Info("Resource in Ready state")
 		adminClient, err := getAdminClient()
 		if err != nil {
-			log.Error(err, "Failed to initialize MinIO admin client")
+			log.Error(err, failedToObtainAdminClientMessage)
 			return setPolicyErrorState(r, ctx, cr, err)
 		}
 
-		policyInfo, err := adminClient.InfoCannedPolicyV2(context.Background(), cr.Name)
+		policyInfo, err := adminClient.InfoCannedPolicyV2(context.Background(), cr.Spec.Name)
 		if err != nil {
 			log.Error(err, "Failed to retrieve policy info")
 			return setPolicyErrorState(r, ctx, cr, err)
@@ -201,10 +192,10 @@ func (r *PolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		// Update policy content
 		adminClient, err := getAdminClient()
 		if err != nil {
-			log.Error(err, "Failed to initialize MinIO admin client")
+			log.Error(err, failedToObtainAdminClientMessage)
 			return setPolicyErrorState(r, ctx, cr, err)
 		}
-		err = adminClient.AddCannedPolicy(context.Background(), cr.Name, []byte(cr.Spec.Content))
+		err = adminClient.AddCannedPolicy(context.Background(), cr.Spec.Name, []byte(cr.Spec.Content))
 		if err != nil {
 			log.Error(err, "Error while updating policy")
 			return setPolicyErrorState(r, ctx, cr, err)
@@ -223,7 +214,6 @@ func (r *PolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	// Error state
 	if cr.Status.State == typeError {
 		log.Info("Resource in error state")
-		// TODO
 		return ctrl.Result{}, nil
 	}
 
@@ -258,7 +248,7 @@ func (r *PolicyReconciler) finalizerOpsForPolicy(cr *operatorv1.Policy) error {
 		return err
 	}
 
-	err = adminClient.RemoveCannedPolicy(context.Background(), cr.Name)
+	err = adminClient.RemoveCannedPolicy(context.Background(), cr.Spec.Name)
 	if err != nil {
 		return err
 	}

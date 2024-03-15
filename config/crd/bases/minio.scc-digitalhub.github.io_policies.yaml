@@ -37,6 +37,12 @@ spec:
             properties:
               content:
                 type: string
+              name:
+                pattern: '[^\s]*'
+                type: string
+            required:
+            - content
+            - name
             type: object
           status:
             description: PolicyStatus defines the observed state of Policy

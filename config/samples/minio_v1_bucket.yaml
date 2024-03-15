@@ -8,7 +8,7 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/created-by: minio-operator
   name: bucket-sample
+  namespace: minio-operator-system
 spec:
-  region: eu-south-1
-  objectLocking: true
+  name: bucket1
   quota: 10000000

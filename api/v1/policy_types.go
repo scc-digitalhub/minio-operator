@@ -22,7 +22,11 @@ import (
 
 // PolicySpec defines the desired state of Policy
 type PolicySpec struct {
-	Content string `json:"content,omitempty"`
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern:=`[^\s]*`
+	Name string `json:"name"`
+	// +kubebuilder:validation:Required
+	Content string `json:"content"`
 }
 
 // PolicyStatus defines the observed state of Policy

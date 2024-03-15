@@ -4,7 +4,8 @@ A Kubernetes operator to handle instances of buckets, users and policies on [Min
 ## Installation
 A number of environment variables must be configured. If you're using the `deployment.yaml` file, you will find them towards the end of the file.
 ```
-MINIO_ENDPOINT: localhost:9000
+WATCH_NAMESPACE: minio-operator-system
+MINIO_ENDPOINT: 192.168.123.123:9000
 MINIO_ACCESS_KEY_ID: minioadmin
 MINIO_SECRET_ACCESS_KEY: minioadmin
 MINIO_USE_SSL: false
@@ -25,24 +26,27 @@ kubectl apply -f config/samples/minio_v1_user.yaml
 
 ## Bucket CR
 A bucket's custom resource properties are:
-- `region`: String corresponding to bucket region
-- `objectLocking`: `true` or `false`
-- `quota`: Number in bytes
+- `name`: **Required**.
+- `quota`: *Optional*. Number in bytes.
 
 A valid sample spec configuration is:
 ``` yaml
 ...
 spec:
-  region: eu-south-1
-  objectLocking: true
+  name: my-bucket
   quota: 10000000
 ```
 
 ## Policy CR
 A policy's custom resource properties are:
-- `content`: Multi-line JSON string of the policy's contents
+- `name`: **Required**.
+- `content`: **Required**. Multi-line JSON string of the policy's contents.
+
+A valid sample spec configuration is:
 ``` yaml
+...
 spec: 
+  name: my-policy
   content: >-
     {
       "Version": "2012-10-17",
@@ -63,16 +67,18 @@ spec:
 
 ## User CR
 A user's custom resource properties are:
-- `accessKey`
-- `secretKey`
-- `policies`: List of policy names
+- `accessKey`: **Required**.
+- `secretKey`: **Required**.
+- `policies`: *Optional*. List of policy names.
+
+A valid sample spec configuration is:
 ``` yaml
 ...
 spec:
   accessKey: usertest
   secretKey: usertest
   policies:
-    - writeonly
+    - readonly
     - diagnostics
-    - policy-sample
+    - my-policy
 ```

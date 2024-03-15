@@ -22,9 +22,16 @@ import (
 
 // UserSpec defines the desired state of User
 type UserSpec struct {
-	AccessKey string   `json:"accessKey,omitempty"`
-	SecretKey string   `json:"secretKey,omitempty"`
-	Policies  []string `json:"policies,omitempty"`
+	// +kubebuilder:validation:Required
+	AccessKey string `json:"accessKey"`
+	// +kubebuilder:validation:Required
+	SecretKey string `json:"secretKey"`
+	// +kubebuilder:validation:Optional
+	Policies []string `json:"policies,omitempty"`
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Enum=enabled;disabled
+	// +kubebuilder:default:=enabled
+	AccountStatus string `json:"accountStatus,omitempty"`
 }
 
 // UserStatus defines the observed state of User

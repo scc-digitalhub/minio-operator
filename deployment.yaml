@@ -551,7 +551,7 @@ spec:
           value: "false"
         - name: MINIO_EMPTY_BUCKET_ON_DELETE
           value: "true"
-        image: albcar/minio-operator:latest
+        image: ghcr.io/scc-digitalhub/minio-operator:latest
         livenessProbe:
           httpGet:
             path: /healthz

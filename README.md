@@ -69,6 +69,7 @@ spec:
 A user's custom resource properties are:
 - `accessKey`: **Required**.
 - `secretKey`: **Required**.
+- `accountStatus`: *Optional* (defaults to `enabled`). Either `enabled` or `disabled`.
 - `policies`: *Optional*. List of policy names.
 
 A valid sample spec configuration is:

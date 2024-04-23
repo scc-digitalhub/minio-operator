@@ -105,11 +105,6 @@ func (r *UserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 				log.Error(err, "Failed to update custom resource to add finalizer")
 				return ctrl.Result{}, err
 			}
-
-			if err := r.Get(ctx, req.NamespacedName, cr); err != nil {
-				log.Error(err, "Failed to re-fetch resource")
-				return ctrl.Result{}, err
-			}
 		}
 
 		// Set policies
@@ -120,10 +115,15 @@ func (r *UserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 			}
 
 			_, err := adminClient.AttachPolicy(context.Background(), req)
-			if err != nil {
+			if err != nil && !strings.Contains(err.Error(), "policy update has no net effect") {
 				log.Error(err, "Error while assigning policies to user")
 				return setUserErrorState(r, ctx, cr, err)
 			}
+		}
+
+		if err := r.Get(ctx, req.NamespacedName, cr); err != nil {
+			log.Error(err, "Failed to re-fetch resource")
+			return ctrl.Result{}, err
 		}
 
 		cr.Status.State = typeReady

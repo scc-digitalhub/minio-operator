@@ -222,11 +222,6 @@ func (r *UserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		return ctrl.Result{}, nil
 	}
 
-	// Update resource
-	if cr.Status.State == typeUpdating {
-		return ctrl.Result{}, nil
-	}
-
 	// Error state
 	if cr.Status.State == typeError {
 		log.Info("Resource in error state")

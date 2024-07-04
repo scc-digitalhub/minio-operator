@@ -92,6 +92,20 @@ func (r *PolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			return setPolicyErrorState(r, ctx, cr, err)
 		}
 
+		// Since MinIO may strip unused fields, retrieve its saved policy and overwrite ours
+		policyInfo, err := adminClient.InfoCannedPolicyV2(context.Background(), cr.Spec.Name)
+		if err != nil {
+			log.Error(err, "Failed to retrieve generated policy info")
+			return setPolicyErrorState(r, ctx, cr, err)
+		}
+		marshalled, err := json.Marshal(policyInfo.Policy)
+		if err != nil {
+			log.Error(err, "Failed to marshal generated policy info")
+			return setPolicyErrorState(r, ctx, cr, err)
+		}
+		cr.Spec.Content = string(marshalled[:])
+		r.Update(ctx, cr)
+
 		// Add finalizer
 		if !controllerutil.ContainsFinalizer(cr, policyFinalizer) {
 			log.Info("Adding finalizer for resource")
@@ -200,6 +214,20 @@ func (r *PolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 			log.Error(err, "Error while updating policy")
 			return setPolicyErrorState(r, ctx, cr, err)
 		}
+
+		// Since MinIO may strip unused fields, retrieve its saved policy and overwrite ours
+		policyInfo, err := adminClient.InfoCannedPolicyV2(context.Background(), cr.Spec.Name)
+		if err != nil {
+			log.Error(err, "Failed to retrieve generated policy info")
+			return setPolicyErrorState(r, ctx, cr, err)
+		}
+		marshalled, err := json.Marshal(policyInfo.Policy)
+		if err != nil {
+			log.Error(err, "Failed to marshal generated policy info")
+			return setPolicyErrorState(r, ctx, cr, err)
+		}
+		cr.Spec.Content = string(marshalled[:])
+		r.Update(ctx, cr)
 
 		// Update status
 		cr.Status.State = typeReady

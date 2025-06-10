@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 # Build the manager binary
 FROM golang:1.21 as builder
 ARG TARGETOS
